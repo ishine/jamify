@@ -1,0 +1,69 @@
+project_root: "."
+
+wandb:
+  project: "JAM"
+  name: "dpo"
+  mode: online
+
+# Training-related parameters
+training:
+  resume_from_safetensors: "your_sft_model.safetensors"
+  grad_accumulation_steps: 4
+  learning_rate: 5.0e-7
+  max_steps: 20000
+  num_warmup_updates: 1000
+  save_per_updates: 100
+  last_per_steps: 400
+  log_every: 8
+
+  checkpoint_path: "outputs/dpo"
+  max_grad_norm: 10
+  beta_dpo: 2000
+
+# Model and data parameters
+model:
+  num_channels: 64
+  cfm:
+    sft: none
+    max_frames: ${max_frames}
+    num_channels: ${model.num_channels}
+    dual_drop_prob: [0.1, 0.5]
+    no_edit: true
+
+  dit:
+    max_frames: ${max_frames}
+    mel_dim: ${model.num_channels}
+    dim: 1408
+    depth: 16
+    heads: 32
+    ff_mult: 4
+    text_dim: 512
+    conv_layers: 4
+    grad_ckpt: true
+    use_implicit_duration: true
+
+data:
+  train_dataset:
+    dpo_json_path: "your_dpo_input.json"
+    # pattern: 'placeholder'
+    vae_sampled: true
+    max_frames: ${max_frames}
+    multiple_styles: true
+    sampling_rate: 44100
+    shuffle: true
+    silence_latent_path: "public/silence_latent.pt"
+    tokenizer_path: "public/en_us_cmudict_ipa_forward.pt"
+    lrc_upsample_factor: ${lrc_upsample_factor}
+    filler: average_sparse
+
+  train_dataloader:
+    batch_size: 1
+    num_workers: 4
+    persistent_workers: true
+    pin_memory: true
+    prefetch_factor: 2
+
+# General settings
+max_frames: 5000
+lrc_upsample_factor: 4
+seed: 42

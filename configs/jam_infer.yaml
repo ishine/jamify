@@ -56,7 +56,7 @@ data:
     multiple_styles: true
     sampling_rate: 44100
     shuffle: true
-    silence_latent_path: ${project_root}/public/silience_latent.pt
+    silence_latent_path: ${project_root}/public/silence_latent.pt
     tokenizer_path: ${project_root}/public/en_us_cmudict_ipa_forward.pt
     lrc_upsample_factor: ${lrc_upsample_factor}
     filler: average_sparse

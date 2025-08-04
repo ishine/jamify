@@ -15,10 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" This implementation is adapted from github repo:
-    https://github.com/ASLP-lab/DiffRhythm.
-"""
-
 import os
 import json
 import random
@@ -36,8 +32,6 @@ import numpy as np
 
 from jam.dataset import enhance_webdataset_config, DiffusionWebDataset
 from jam.model.vae import StableAudioOpenVAE, DiffRhythmVAE
-
-# DiffRhythm imports for CFM+DiT model
 from jam.model import CFM, DiT
 
 def get_negative_style_prompt(device, file_path):
