@@ -1,4 +1,7 @@
-# Copyright (c) 2025 ASLP-LAB
+# Copyright (c) 2025 Project Jamify
+#               2025 Declare-Lab
+#               2025 AMAAI Lab
+#               2025 Renhang Liu (liurenhang0@gmail.com)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +16,9 @@
 # limitations under the License.
 
 """ This implementation is adapted from github repo:
-    https://github.com/SWivid/F5-TTS.
+    https://github.com/ASLP-lab/DiffRhythm.
 """
+
 
 from __future__ import annotations
 
