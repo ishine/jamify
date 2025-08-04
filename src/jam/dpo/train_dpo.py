@@ -1,3 +1,20 @@
+# Copyright (c) 2025 Project Jamify
+#               2025 Declare-Lab
+#               2025 AMAAI Lab
+#               2025 Renhang Liu (liurenhang0@gmail.com)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 DPO Training Script for DiffRhythm
 
@@ -14,7 +31,7 @@ from jam.model.dit import DiT
 
 def main():
     cfg_cli = OmegaConf.from_dotlist(sys.argv[1:])
-    config_path = cfg_cli.get("config", "configs/diffrhythm/train_dpo_1.yaml")
+    config_path = cfg_cli.get("config", "configs/dpo.yaml")
     cfg = OmegaConf.load(config_path)
     cfg = OmegaConf.merge(cfg, cfg_cli)
 

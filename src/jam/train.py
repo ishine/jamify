@@ -28,7 +28,7 @@ os.environ['MKL_NUM_THREADS']="1"
 
 def main():
     cfg_cli = OmegaConf.from_dotlist(sys.argv[1:])
-    config_path = cfg_cli.get("config", "configs/diffrhythm/default.yaml")
+    config_path = cfg_cli.get("config", "configs/default.yaml")
     cfg = OmegaConf.load(config_path)
     cfg = OmegaConf.merge(cfg, cfg_cli)
 

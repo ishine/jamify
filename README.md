@@ -12,7 +12,10 @@
 JAM is a rectified flow-based model for lyrics-to-song generation that addresses the lack of fine-grained word-level controllability in existing lyrics-to-song models. Built on a compact 530M-parameter architecture with 16 LLaMA-style Transformer layers as the Diffusion Transformer (DiT) backbone, JAM enables precise vocal control that musicians desire in their workflows. Unlike previous models, JAM provides word and phoneme-level timing control, allowing musicians to specify the exact placement of each vocal sound for improved rhythmic flexibility and expressive timing.
 
 ## News
+> 📣 05/08/25: Training code has been released! You can now train your own JAM models from scratch.
+
 > 📣 29/07/25: We have released JAM-0.5, the first version of the AI song generator from Project Jamify!
+
 
 ## Features
 
@@ -27,6 +30,34 @@ JAM is a rectified flow-based model for lyrics-to-song generation that addresses
 ## The Pipeline
 
 ![cover-photo](jam.png)
+
+## Table of Contents
+
+- [JAM Samples](#jam-samples)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Inference](#inference)
+  - [Command Line Interface](#command-line-interface)
+  - [Configuration Options](#configuration-options)
+  - [Input File Formats](#input-file-formats)
+  - [Output Structure](#output-structure)
+- [Training](#training)
+  - [Data Formats](#data-formats)
+    - [WebDataset Format (Pretrain & SFT)](#webdataset-format-pretrain--sft)
+    - [DPO JSON Format](#dpo-json-format)
+  - [Training Commands](#training-commands)
+    - [Pretraining](#pretraining)
+    - [Supervised Fine-tuning (SFT)](#supervised-fine-tuning-sft)
+    - [Direct Preference Optimization (DPO)](#direct-preference-optimization-dpo)
+  - [Configuration Options](#configuration-options-1)
+  - [Monitoring](#monitoring)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+- [Model Downloads](#model-downloads)
+- [Citation](#citation)
+- [License](#license)
+- [Support](#support)
 
 ## JAM Samples
 
@@ -121,7 +152,7 @@ Required files:
 - **Lyrics file**: JSON with timestamped lyrics
 - **Prompt file**: Text description of desired style/genre. Text prompt is not used in the default setting where the audio reference is utilized.
 
-## Advanced Usage
+## Inference
 
 ### Using `python -m jam.infer`
 
@@ -144,15 +175,13 @@ Use Accelerate for distributed inference:
 
 ```bash
 # Basic usage with custom checkpoint
-accelerate launch --config_path path/to/accelerate/config.yaml jam.infer
+accelerate launch -m jam.infer config=configs/jam_infer.yaml
 
 # With custom configuration file
-accelerate launch --config_path path/to/accelerate/config.yaml jam.infer config=path/to/inference/config.yaml
+accelerate launch -m jam.infer config=configs/jam_infer.yaml
 ```
 
-## Configuration Options
-
-### Key Parameters
+### Configuration Options
 
 #### Evaluation Settings
 - `evaluation.checkpoint_path`: Path to model checkpoint (required)
@@ -168,9 +197,9 @@ accelerate launch --config_path path/to/accelerate/config.yaml jam.infer config=
 - `evaluation.num_style_secs`: Style audio duration in seconds (default: 30)
 - `evaluation.random_crop_style`: Randomly crop style audio (default: false)
 
-## Input File Formats
+### Input File Formats
 
-### Lyrics File (`*.json`)
+#### Lyrics File (`*.json`)
 ```json
 [
     {"start": 2.2, "end": 2.5, "word": "First word of lyrics"},
@@ -179,12 +208,12 @@ accelerate launch --config_path path/to/accelerate/config.yaml jam.infer config=
 ]
 ```
 
-### Style Prompt File (`*.txt`)
+#### Style Prompt File (`*.txt`)
 ```
 Electronic dance music with heavy bass and synthesizers
 ```
 
-### Input Manifest (`input.json`)
+#### Input Manifest (`input.json`)
 ```json
 [
   {
@@ -197,7 +226,7 @@ Electronic dance music with heavy bass and synthesizers
 ]
 ```
 
-## Output Structure
+### Output Structure
 
 Generated files are saved to the output directory:
 
@@ -210,11 +239,149 @@ outputs/
 └── generation_config.yaml  # Configuration used for generation
 ```
 
-## Performance Tips
+## Training
 
-1. **GPU Memory**: Use `evaluation.batch_size=1` for large on limited VRAM
-2. **Multi-GPU**: Use `accelerate launch` for faster processing of multiple samples
-3. **Mixed Precision**: Add `--mixed_precision=fp16` to reduce memory usage
+JAM supports three training stages: pretraining, supervised fine-tuning (SFT), and direct preference optimization (DPO). Each stage requires specific data formats and training commands.
+
+### Data Formats
+
+#### WebDataset Format (Pretrain & SFT)
+
+For pretraining and SFT, JAM expects data in WebDataset format - tar files containing:
+
+```
+your_dataset-000000.tar
+├── song_id_1/
+│   ├── latent.pt      # Audio latent representation (torch tensor)
+│   ├── style.pt       # MuQ style embedding (torch tensor, 512-dim or n*512-dim)  
+│   └── json           # Metadata with phoneme information
+├── song_id_2/
+│   ├── latent.pt
+│   ├── style.pt
+│   └── json
+└── ...
+```
+
+**JSON Structure:**
+```json
+{
+  "word": [
+    {"start": 2.2, "end": 2.5, "phoneme": "ˈfɜrst"},
+    {"start": 2.5, "end": 3.7, "phoneme": "wɜrd"},
+    ...
+  ]
+}
+```
+
+**ID List JSONL (Optional):**
+When provided via `id_list_jsonl`, enables advanced filtering and sampling:
+```jsonl
+{"id": "song_id_1", "duration": 180.5}
+{"id": "song_id_2", "duration": 95.2}
+```
+
+Features when ID list is provided:
+- Filter training to specific song IDs
+- Duration-based sampling (`resample_by_duration_threshold`)
+- Duration filtering (`ignore_by_duration_threshold`)
+
+**Style Embeddings:**
+Style embeddings are precomputed MuQ (Music Understanding Query) representations:
+- **Single Style**: 512-dimensional tensor when `multiple_styles: false`
+- **Multiple Styles**: n×512-dimensional tensor when `multiple_styles: true`
+  - During training, one random style is selected from the n available styles
+  - Enables style variation and data augmentation
+
+#### DPO JSON Format
+
+For DPO training, provide a JSON file with preference pairs:
+
+```json
+[
+  {
+    "win_latent": "path/to/preferred_latent.pt",
+    "loss_latent": "path/to/dispreferred_latent.pt", 
+    "transcription": "path/to/lyrics.json",
+    "style": "path/to/style.pt",
+    "gt_latent": "path/to/ground_truth.pt"
+  }
+]
+```
+
+**Required Fields:**
+- `win_latent`: Path to preferred latent representation
+- `loss_latent`: Path to dispreferred latent representation  
+- `transcription`: Path to JSON file with lyrics/phoneme data (same format as WebDataset JSON)
+- `style`: Path to MuQ style embedding (same format as WebDataset style.pt)
+
+**Conditional Fields:**
+- `gt_latent`: Required when DPO mode is set to "gt" in configuration
+
+### Training Commands
+
+#### Pretraining
+
+```bash
+accelerate launch -m jam.train config=configs/pretrain.yaml
+```
+
+Key configuration parameters in `configs/pretrain.yaml`:
+- `data.train_dataset.pattern`: Path pattern to WebDataset tar files, e.g. `your_jam_dataset-{000000..000485}.tar`
+- `data.train_dataset.id_list_jsonl`: Optional ID list for filtering
+- `training.max_steps`: Total training steps
+- `training.checkpoint_path`: Output directory for checkpoints
+
+#### Supervised Fine-tuning (SFT)
+
+```bash
+accelerate launch -m jam.train config=configs/sft.yaml
+```
+
+Key differences from pretraining:
+- `training.resume_from_safetensors`: Path to pretrained model
+- Higher `max_frames` for full-song training
+- `model.dit.grad_ckpt: true` for memory efficiency
+
+#### Direct Preference Optimization (DPO)
+
+```bash
+accelerate launch -m jam.dpo.train_dpo config=configs/dpo.yaml
+```
+
+Key DPO parameters:
+- `data.train_dataset.dpo_json_path`: Path to DPO preference data
+- `training.resume_from_safetensors`: Path to SFT model
+- `training.beta_dpo`: DPO regularization strength
+- `model.cfm.sft`: Set to "none" for classic DPO, "gt" for additional sft loss using ground truth latents, "win" if winning candidates are used as ground truth
+
+### Configuration Options
+
+#### Training Parameters
+- `max_steps`: Total training steps
+- `learning_rate`: Learning rate (typically 7.5e-5 for pretrain/SFT, 5.0e-7 for DPO)
+- `grad_accumulation_steps`: Gradient accumulation steps
+- `save_per_updates`: Checkpoint saving frequency
+
+#### Data Parameters  
+- `max_frames`: Maximum sequence length
+- `batch_size`: Training batch size
+- `shuffle`: Whether to shuffle training data
+- `multiple_styles`: Whether to use multiple style embeddings (n×512-dim) with random selection
+
+#### Model Parameters
+- `grad_ckpt`: Enable gradient checkpointing for memory efficiency
+- `dual_drop_prob`: Dual dropout probabilities for CFM training
+
+### Monitoring
+
+Training progress is logged to Weights & Biases. Configure in your YAML:
+
+```yaml
+wandb:
+  project: "JAM"
+  name: "my_training_run" 
+  mode: online  # or offline
+```
 
 ## Troubleshooting
 
@@ -246,7 +413,6 @@ The `inference.py` script automatically downloads the JAM-0.5 model. For manual 
 from huggingface_hub import snapshot_download
 model_path = snapshot_download(repo_id="declare-lab/jam-0.5")
 ```
-
 ## Citation
 
 If you use JAM in your research, please cite:
