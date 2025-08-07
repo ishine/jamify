@@ -81,7 +81,7 @@ These samples demonstrate JAM's ability to generate high-quality music across di
 
 ```bash
 git clone https://github.com/declare-lab/jamify
-cd jam
+cd jamify
 ```
 
 ### 2. Run Installation Script
